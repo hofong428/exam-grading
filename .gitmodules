@@ -1,3 +1,6 @@
 [submodule "learning-cxx"]
 	path = learning-cxx
 	url = https://github.com/hofong428/c-exam.git
+[submodule "learning-lm-rs"]
+	path = learning-lm-rs
+	url = https://github.com/hofong428/learning-lm-rs.git
