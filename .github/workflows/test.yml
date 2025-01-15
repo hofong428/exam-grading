@@ -1,8 +1,9 @@
+
 name: GitHub Classroom Workflow
 
 on:
   push:
-    branches: [ main,dev ]
+    branches: [ main,dev]
     paths-ignore:
       - 'README.md'
   pull_request:
@@ -61,7 +62,6 @@ jobs:
         else
           echo "::set-output name=run_project2::false"
         fi
-
   rustlings:
     name: Rustlings Autograding
     needs: initialize
@@ -101,12 +101,10 @@ jobs:
       run: |
         outfile=".github/result/rust_result.json"
         summary_file=".github/result/rustlings_summary.json"
-
         # 提取需要的值
         total_exercations=$(jq '.statistics.total_exercations' $outfile)
         total_succeeds=$(jq '.statistics.total_succeeds' $outfile)
         github_user="${{ github.actor }}"
-
         # 生成新的 JSON 内容
         new_json=$(jq -n \
           --arg channel "github" \
@@ -116,17 +114,13 @@ jobs:
           --argjson score "$total_succeeds" \
           --argjson totalScore "$total_exercations" \
           '{channel: $channel, courseId: $courseId, ext: $ext, name: $name, score: $score, totalScore: $totalScore}')
-
         # 保存新的 JSON 文件
         echo "$new_json" > $summary_file
-
         # 打印新的 JSON 文件到终端
         cat $summary_file
-
     - name: Post summary JSON to remote API
       run: |
         summary_file=".github/result/rustlings_summary.json"
-
         # 发送 POST 请求
         curl -X POST "$API_URL" \
           -H "accept: application/json;charset=utf-8" \
@@ -134,7 +128,6 @@ jobs:
           -H "token: $TOKEN"\
           -d "$(cat $summary_file)" \
           -v
-
   cxx:
     name: C++ Autograding
     needs: initialize
@@ -164,20 +157,15 @@ jobs:
       run: |
         outfile="test_output.txt"
         summary_file="./../.github/result/cxx_result.json"
-
         # 获取最后一行信息并进行处理
         info_line=$(tail -n 1 $outfile | sed 's/\x1b\[[0-9;]*m//g')
-
         # 提取通过题数和总题目数量
         total_succeeds=$(echo $info_line | cut -d' ' -f1 | cut -d'/' -f1)
         total_exercises=$(echo $info_line | cut -d' ' -f1 | cut -d'/' -f2)
-
         # 提取题目状态字符串
         status_string=$(echo $info_line | cut -d' ' -f2 | tr -d '[]')
-
         # 初始化总失败数
         total_failures=$((total_exercises - total_succeeds))
-
         # 遍历状态字符串并更新 JSON 中的 result 字段
         for (( i=0; i<${#status_string}; i++ )); do
           exercise_name=$(printf "exercise%02d" $i)
@@ -187,14 +175,11 @@ jobs:
           else
             result="false"
           fi
-
           # 直接修改 JSON 文件中的相应字段
           jq --arg name "$exercise_name" --arg result "$result" '.exercises |= map(if .name == $name then .result = ($result | test("true")) else . end)' $summary_file > tmp.json && mv tmp.json $summary_file
         done
-
         # 更新统计信息
         jq --argjson succeeds "$total_succeeds" --argjson failures "$total_failures" '.statistics.total_succeeds = $succeeds | .statistics.total_failures = $failures' $summary_file > tmp.json && mv tmp.json $summary_file
-
         # 打印新的 JSON 文件到终端
         cat $summary_file
       working-directory: learning-cxx
@@ -207,12 +192,10 @@ jobs:
       run: |
         outfile=".github/result/cxx_result.json"
         summary_file=".github/result/cxx_summary.json"
-
         # 提取需要的值
         total_exercations=$(jq '.statistics.total_exercations' $outfile)
         total_succeeds=$(jq '.statistics.total_succeeds' $outfile)
         cxx_user="${{ github.actor }}"
-
         # 生成新的 JSON 内容
         new_json=$(jq -n \
           --arg channel "github" \
@@ -225,14 +208,11 @@ jobs:
           
         # 保存新的 JSON 文件
         echo "$new_json" > $summary_file
-
         # 打印新的 JSON 文件到终端
         cat $summary_file
-
     - name: Post summary JSON to remote API
       run: |
         summary_file=".github/result/cxx_summary.json"
-
         # 发送 POST 请求
         curl -X POST "$API_URL" \
           -H "accept: application/json;charset=utf-8" \
@@ -250,6 +230,7 @@ jobs:
       points: ${{ steps.autograding.outputs.points}}
     env:
       API_URL: ${{ needs.initialize.outputs.api_url }}
+      TOKEN: ${{ needs.initialize.outputs.token }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -270,7 +251,6 @@ jobs:
       run: |
         test_output="test_output.txt"
         json_file="./../.github/result/TinyInfiniTensor_result.json"
-
         test_list=(
           "test_allocator"
           "test_graph"
@@ -284,19 +264,16 @@ jobs:
           "test_nativecpu_elementwise"
           "test_nativecpu_transpose"
         )
-
         # 初始化计数器
         total_exercations=0
         total_succeeds=0
         total_failures=0
         exercises_json="[]"
-
         # 解析输出
         while read -r line; do
           if [[ "$line" =~ ^[0-9]+/[0-9]+[[:space:]]+Test[[:space:]]+#[0-9]+:[[:space:]]+([a-zA-Z_]+).+(Passed|Failed).*$ ]]; then
             test_name="${BASH_REMATCH[1]}"
             test_result="${BASH_REMATCH[2]}"
-
             for element in "${test_list[@]}"; do
               if [[ "$element" == "$test_name" ]]; then
                 # 计数
@@ -312,7 +289,6 @@ jobs:
             done
           fi
         done < "$test_output"
-
         # 生成最终 JSON
         final_json=$(jq -n \
           --argjson exercises "$exercises_json" \
@@ -322,10 +298,8 @@ jobs:
           --argjson total_failures "$total_failures" \
           --argjson total_time 3 \
           '{exercises: $exercises, user_name: $user_name, statistics: {total_exercations: $total_exercations, total_succeeds: $total_succeeds, total_failures: $total_failures, total_time: $total_time}}')
-
         # 保存到 JSON 文件
         echo "$final_json" > "$json_file"
-
         # 打印新的 JSON 文件到终端
         cat $json_file
       working-directory: TinyInfiniTensor
@@ -338,33 +312,29 @@ jobs:
       run: |
         outfile=".github/result/TinyInfiniTensor_result.json"
         summary_file=".github/result/TinyInfiniTensor_summary.json"
-
         # 提取需要的值
         total_exercations=$(jq '.statistics.total_exercations' $outfile)
         total_succeeds=$(jq '.statistics.total_succeeds' $outfile)
         pr1_user="${{ github.actor }}"
-
         new_json=$(jq -n \
           --arg channel "github" \
-          --argjson courseId 1701 \
+          --argjson courseId 1753 \
           --arg ext "aaa" \
           --arg name "$pr1_user" \
           --argjson score "$total_succeeds" \
           --argjson totalScore "$total_exercations" \
           '{channel: $channel, courseId: $courseId, ext: $ext, name: $name, score: $score, totalScore: $totalScore}')
-
         echo "$new_json" > $summary_file
         cat $summary_file
-
     - name: Post summary JSON for TinyInfiniTensor
       run: |
         summary_file=".github/result/TinyInfiniTensor_summary.json"
         curl -X POST "$API_URL" \
           -H "accept: application/json;charset=utf-8" \
           -H "Content-Type: application/json" \
+          -H "token: $TOKEN"\
           -d "$(cat $summary_file)" \
           -v
-
   learning-lm-rs:
     name: learning-lm-rs Autograding
     needs: initialize
@@ -401,7 +371,6 @@ jobs:
       run: |
         test_output="test_output.txt"
         json_file="./../.github/result/learning-lm-rs_result.json"
-
         test_list=(
           "model::test_mlp"
           "operators::test_rms_norm"
@@ -409,19 +378,16 @@ jobs:
           "operators::test_silu"
           "model::test_load_safetensors"
         )
-
         # 初始化计数器
         total_exercations=0
         total_succeeds=0
         total_failures=0
         exercises_json="["
-
         # 从测试输出中提取测试结果
         while IFS= read -r line; do
           if [[ $line =~ test\ (.+)\ \.\.\.\ (FAILED|ok) ]]; then
             test_name="${BASH_REMATCH[1]}"
             test_result="${BASH_REMATCH[2]}"
-
             for element in "${test_list[@]}"; do
               if [[ "$element" == "$test_name" ]]; then
                 # 计数
@@ -437,10 +403,8 @@ jobs:
             done
           fi
         done < "$test_output"
-
         # 去掉最后一个逗号并闭合 JSON 数组
         exercises_json="${exercises_json%,}]"
-
         # 生成最终 JSON
         final_json=$(jq -n \
           --argjson exercises "$exercises_json" \
@@ -450,10 +414,8 @@ jobs:
           --argjson total_failures "$total_failures" \
           --argjson total_time 3 \
           '{exercises: $exercises, user_name: $user_name, statistics: {total_exercations: $total_exercations, total_succeeds: $total_succeeds, total_failures: $total_failures, total_time: $total_time}}')
-
         # 保存到 JSON 文件
         echo "$final_json" > "$json_file"
-
         # 打印新的 JSON 文件到终端
         cat $json_file
       working-directory: learning-lm-rs
@@ -466,16 +428,14 @@ jobs:
       run: |
         outfile=".github/result/learning-lm-rs_result.json"
         summary_file=".github/result/learning-lm-rs_summary.json"
-
         # 提取需要的值
         total_exercations=$(jq '.statistics.total_exercations' $outfile)
         total_succeeds=$(jq '.statistics.total_succeeds' $outfile)
         pr2_user="${{ github.actor }}"
-
         # 生成新的 JSON 内容
         new_json=$(jq -n \
           --arg channel "github" \
-          --argjson courseId 1703 \
+          --argjson courseId 1754 \
           --arg ext "aaa" \
           --arg name "$pr2_user" \
           --argjson score "$total_succeeds" \
@@ -484,14 +444,11 @@ jobs:
           
         # 保存新的 JSON 文件
         echo "$new_json" > $summary_file
-
         # 打印新的 JSON 文件到终端
         cat $summary_file
-
     - name: Post summary JSON for learning-lm-rs
       run: |
         summary_file=".github/result/learning-lm-rs_summary.json"
-
         # 发送 POST 请求
         curl -X POST "$API_URL" \
           -H "accept: application/json;charset=utf-8" \
